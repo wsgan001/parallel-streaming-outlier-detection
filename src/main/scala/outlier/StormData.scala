@@ -3,7 +3,7 @@ package outlier
 import scala.collection.mutable.ListBuffer
 
 class StormData(data1d: Data1d) extends Data1d(data1d.value, data1d.arrival, data1d.flag, data1d.id) {
-  var count_after: Int = 1
+  var count_after: Int = 0
   var nn_before = ListBuffer[Long]()
 
   override def equals(other: Any): Boolean = other match {
@@ -18,5 +18,5 @@ class StormData(data1d: Data1d) extends Data1d(data1d.value, data1d.arrival, dat
     case _ => false
   }
 
-  override def toString = s"StormData($id, $arrival)"
+  override def toString = s"StormData($id, $count_after, $nn_before)"
 }
