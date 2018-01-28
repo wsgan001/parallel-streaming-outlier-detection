@@ -29,7 +29,7 @@ import scala.util.control.Breaks._
 object outlierDetect {
 
   //partitioning
-  val parallelism: Int = 10
+  val parallelism: Int = 8
   //count window variables (total / partitions)
   val count_window: Int = 10000
   val count_slide: Int = 500
@@ -82,14 +82,15 @@ object outlierDetect {
       .allowedLateness(Time.milliseconds(5000))
       .evictor(new StormEvictor)
       .process(new ExactStorm)
-
+//
     val keyedData2 = keyedData
       .keyBy(_.id % parallelism)
       .timeWindow(Time.milliseconds(time_slide))
       .process(new GroupMetadata)
 ////      .reduce((a,b) => a)
+      .print()
 
-    keyedData2.print()
+//    keyedData.print()
 
 //    val groupedOutliers = keyedData2
 //      .keyBy(_._1)
@@ -150,7 +151,7 @@ object outlierDetect {
           refreshList(p, inputList, window)
         })
         inputList.foreach(p => out.collect(p))
-
+//out.collect(inputList.head)
         //update stats
         val time2 = System.currentTimeMillis()
         val tmpkey = window.getEnd.toString
@@ -198,14 +199,12 @@ object outlierDetect {
 
   case class Metadata(var outliers: Map[Int, StormData])
 
-  class GroupMetadata extends ProcessWindowFunction[StormData, String, Int, TimeWindow] {
-
-    override def process(key: Int, context: Context, elements: scala.Iterable[StormData], out: Collector[String]): Unit = {
-
-      out.collect("test")
-
+  class GroupMetadata extends ProcessWindowFunction[(StormData), (Long, Int), Int, TimeWindow] {
+    override def process(key: Int, context: Context, elements: scala.Iterable[(StormData)], out: Collector[(Long, Int)]): Unit = {
+      out.collect((context.window.getEnd, 5))
     }
   }
+
 
   class ShowOutliers extends ProcessWindowFunction[(Long,Int), String, Long, TimeWindow] {
 
@@ -240,7 +239,7 @@ object outlierDetect {
           val newValue = tmpValue + tmpvalue
           times_per_slide += ((tmpkey, newValue))
         }
-        out.collect(s"${elements.size}")
+        out.collect(s"size: ${elements.size} time: ${time2 - time1}")
       }
     }
 
