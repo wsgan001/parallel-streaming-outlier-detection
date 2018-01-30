@@ -82,22 +82,19 @@ object outlierDetect {
       .allowedLateness(Time.milliseconds(5000))
       .evictor(new StormEvictor)
       .process(new ExactStorm)
-//
+//            .process(new ExactStormDebug)
+
     val keyedData2 = keyedData
       .keyBy(_.id % parallelism)
       .timeWindow(Time.milliseconds(time_slide))
       .process(new GroupMetadata)
-////      .reduce((a,b) => a)
-      .print()
 
-//    keyedData.print()
+    val groupedOutliers = keyedData2
+      .keyBy(_._1)
+      .timeWindow(Time.milliseconds(time_slide))
+      .process(new ShowOutliers)
 
-//    val groupedOutliers = keyedData2
-//      .keyBy(_._1)
-//      .timeWindow(Time.milliseconds(time_slide))
-//      .process(new ShowOutliers)
-
-//    groupedOutliers.print()
+    groupedOutliers.print()
 
     println("Starting outlier test")
     val timeStart = System.currentTimeMillis()
@@ -148,10 +145,10 @@ object outlierDetect {
         val inputList = elements.map(_._2).toList
 
         inputList.filter(_.arrival >= window.getEnd - time_slide).foreach(p => {
-          refreshList(p, inputList, window)
+          refreshList(p, inputList, context.window)
         })
         inputList.foreach(p => out.collect(p))
-//out.collect(inputList.head)
+
         //update stats
         val time2 = System.currentTimeMillis()
         val tmpkey = window.getEnd.toString
@@ -168,22 +165,21 @@ object outlierDetect {
     }
 
     def refreshList(node: StormData, nodes: List[StormData], window: TimeWindow): Unit = {
-      if (nodes.size != 0) {
+      if (nodes.nonEmpty) {
         val neighbors = nodes
-          .map(x => (x, distance(x,node)))
+          .map(x => (x, distance(x, node)))
           .filter(_._2 <= range).map(_._1)
 
         neighbors
-          .filter(_.arrival < window.getEnd - time_slide)
-          .foreach(p => node.nn_before.+=(p.arrival)) //add previous neighbors to new node
-
-        neighbors
-          .filter(p => p.arrival >= window.getEnd - time_slide && p.id != node.id)
-          .foreach(p => node.count_after += 1)
+          .foreach(x => {
+            if (x.arrival < window.getEnd - time_slide)
+              node.insert_nn_before(x.arrival, k)
+            else
+              node.count_after += 1
+          })
 
         nodes
-          .filter(x => x.arrival < window.getEnd - time_slide)
-          .filter(x => neighbors.contains(x))
+          .filter(x => x.arrival < window.getEnd - time_slide && neighbors.contains(x))
           .foreach(n => n.count_after += 1) //add new neighbor to previous nodes
       }
     }
@@ -200,15 +196,90 @@ object outlierDetect {
   case class Metadata(var outliers: Map[Int, StormData])
 
   class GroupMetadata extends ProcessWindowFunction[(StormData), (Long, Int), Int, TimeWindow] {
-    override def process(key: Int, context: Context, elements: scala.Iterable[(StormData)], out: Collector[(Long, Int)]): Unit = {
-      out.collect((context.window.getEnd, 5))
+
+    lazy val state: ValueState[Metadata] = getRuntimeContext
+      .getState(new ValueStateDescriptor[Metadata]("metadata", classOf[Metadata]))
+
+    override def process(key: Int, context: Context, elements: scala.Iterable[StormData], out: Collector[(Long, Int)]): Unit = {
+      val time1 = System.currentTimeMillis()
+      val window = context.window
+      var current: Metadata = state.value
+      if (current == null) { //populate list for the first time
+        var newMap = Map[Int, StormData]()
+        //all elements are new to the window so we have to combine the same ones
+        //and add them to the map
+        for (el <- elements) {
+          val oldEl = newMap.getOrElse(el.id, null)
+          if (oldEl == null) {
+            newMap += ((el.id, el))
+          } else {
+            val newValue = combineElements(oldEl, el)
+            newMap += ((el.id, newValue))
+          }
+        }
+        current = Metadata(newMap)
+      } else { //update list
+
+        //first remove old elements
+        var forRemoval = ListBuffer[Int]()
+        for (el <- current.outliers.values) {
+          if (el.arrival < window.getEnd - time_window) {
+            forRemoval = forRemoval.+=(el.id)
+          }
+        }
+        forRemoval.foreach(el => current.outliers -= (el))
+        //then insert or combine elements
+        for (el <- elements) {
+          val oldEl = current.outliers.getOrElse(el.id, null)
+          if (oldEl == null) {
+            current.outliers += ((el.id, el))
+          } else {
+            if (el.arrival < window.getEnd - time_slide) {
+              oldEl.count_after = el.count_after
+              current.outliers += ((el.id, oldEl))
+            } else {
+              val newValue = combineElements(oldEl, el)
+              current.outliers += ((el.id, newValue))
+            }
+          }
+        }
+      }
+      state.update(current)
+
+      if (current.outliers.size > k) {
+
+        var outliers = ListBuffer[Int]()
+        for (el <- current.outliers.values) {
+          val nnBefore = el.nn_before.count(_ > window.getEnd - time_window)
+          if (nnBefore + el.count_after < k) outliers.+=(el.id)
+        }
+
+        out.collect((window.getEnd, outliers.size))
+      }
+      //update stats
+      val time2 = System.currentTimeMillis()
+      val tmpkey = window.getEnd.toString
+      val tmpvalue = time2 - time1
+      val oldValue = times_per_slide.getOrElse(tmpkey, null)
+      if (oldValue == null) {
+        times_per_slide += ((tmpkey, tmpvalue))
+      } else {
+        val tmpValue = oldValue.toString.toLong
+        val newValue = tmpValue + tmpvalue
+        times_per_slide += ((tmpkey, newValue))
+      }
     }
+
+    def combineElements(el1: StormData, el2: StormData): StormData = {
+      el1.nn_before.++=(el2.nn_before)
+      el1
+    }
+
   }
 
+  class ShowOutliers extends ProcessWindowFunction[(Long, Int), String, Long, TimeWindow] {
 
-  class ShowOutliers extends ProcessWindowFunction[(Long,Int), String, Long, TimeWindow] {
-
-    override def process(key: Long, context: Context, elements: scala.Iterable[(Long,Int)], out: Collector[String]): Unit = {
+    override def process(key: Long, context: Context, elements: scala.Iterable[(Long, Int)], out: Collector[String]): Unit = {
       val outliers = elements.toList.map(_._2).sum
       out.collect(s"window: $key outliers: $outliers")
     }
@@ -223,9 +294,10 @@ object outlierDetect {
         val inputList = elements.map(_._2).toList
 
         inputList.filter(_.arrival >= window.getEnd - time_slide).foreach(p => {
-          refreshList(p, inputList, window)
+          refreshList(p, inputList, context.window)
         })
-        inputList.foreach(p => System.currentTimeMillis())
+        if(inputList.count(_.id == 500) == 1)
+          out.collect(s"window: ${window} el: ${inputList.filter(_.id == 500).head}")
 
         //update stats
         val time2 = System.currentTimeMillis()
@@ -239,27 +311,25 @@ object outlierDetect {
           val newValue = tmpValue + tmpvalue
           times_per_slide += ((tmpkey, newValue))
         }
-        out.collect(s"size: ${elements.size} time: ${time2 - time1}")
       }
     }
 
     def refreshList(node: StormData, nodes: List[StormData], window: TimeWindow): Unit = {
-      if (nodes.size != 0) {
+      if (nodes.nonEmpty) {
         val neighbors = nodes
-          .map(x => (x, distance(x,node)))
+          .map(x => (x, distance(x, node)))
           .filter(_._2 <= range).map(_._1)
 
         neighbors
-          .filter(_.arrival < window.getEnd - time_slide)
-          .foreach(p => node.nn_before.+=(p.arrival)) //add previous neighbors to new node
-
-        neighbors
-          .filter(p => p.arrival >= window.getEnd - time_slide && p.id != node.id)
-          .foreach(p => node.count_after += 1)
+          .foreach(x => {
+            if (x.arrival < window.getEnd - time_slide)
+              node.insert_nn_before(x.arrival, k)
+            else
+              node.count_after += 1
+          })
 
         nodes
-          .filter(x => x.arrival < window.getEnd - time_slide)
-          .filter(x => neighbors.contains(x))
+          .filter(x => x.arrival < window.getEnd - time_slide && neighbors.contains(x))
           .foreach(n => n.count_after += 1) //add new neighbor to previous nodes
       }
     }
@@ -269,6 +339,8 @@ object outlierDetect {
       val res = scala.math.sqrt(value)
       res
     }
+
+
 
 
   }
