@@ -82,7 +82,6 @@ object outlierDetect {
       .allowedLateness(Time.milliseconds(5000))
       .evictor(new StormEvictor)
       .process(new ExactStorm)
-//            .process(new ExactStormDebug)
 
     val keyedData2 = keyedData
       .keyBy(_.id % parallelism)
@@ -271,7 +270,9 @@ object outlierDetect {
     }
 
     def combineElements(el1: StormData, el2: StormData): StormData = {
-      el1.nn_before.++=(el2.nn_before)
+      for (elem <- el2.nn_before) {
+        el1.insert_nn_before(elem, k)
+      }
       el1
     }
 
