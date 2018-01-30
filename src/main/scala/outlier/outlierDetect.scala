@@ -109,7 +109,6 @@ object outlierDetect {
             val value2 = n.nn_before.count(p => p >= window.getStart)
             value1 + value2 < k
           })
-        val no_outliers = outliers.size
         out.collect(s"window: $window outliers: ${outliers.size}")
       }
       val time2 = System.currentTimeMillis()
@@ -117,18 +116,18 @@ object outlierDetect {
     }
 
     def refreshList(node: StormData, nodes: List[StormData], window: TimeWindow): Unit = {
-      if (nodes.size != 0) {
+      if (nodes.nonEmpty) {
         val neighbors = nodes
           .map(x => (x, distance(x,node)))
           .filter(_._2 <= range).map(_._1)
 
         neighbors
-          .filter(_.arrival < window.getEnd - time_slide)
-          .foreach(p => node.nn_before.+=(p.arrival)) //add previous neighbors to new node
-
-        neighbors
-          .filter(_.arrival >= window.getEnd - time_slide)
-          .foreach(p => node.count_after += 1)
+          .foreach(x => {
+            if (x.arrival < window.getEnd - time_slide)
+              node.insert_nn_before(x.arrival, k)
+            else
+              node.count_after += 1
+          })
 
         nodes
           .filter(x => x.arrival < window.getEnd - time_slide)

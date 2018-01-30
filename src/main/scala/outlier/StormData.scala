@@ -6,6 +6,16 @@ class StormData(data1d: Data1d) extends Data1d(data1d.value, data1d.arrival, dat
   var count_after: Int = 0
   var nn_before = ListBuffer[Long]()
 
+  def insert_nn_before(el: Long, k: Int): Unit ={
+    if(nn_before.size == k){
+      val tmp = nn_before.min
+      nn_before.-=(tmp)
+      nn_before.+=(el)
+    }else{
+      nn_before.+=(el)
+    }
+  }
+
   override def equals(other: Any): Boolean = other match {
     case that: Data1d => {
       value == that.value &&
