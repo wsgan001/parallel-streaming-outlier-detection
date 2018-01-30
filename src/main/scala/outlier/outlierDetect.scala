@@ -1,21 +1,14 @@
 package outlier
 
 import java.lang.Iterable
-import java.util
-import javax.management.Query
 
-import mtree._
-import org.apache.flink.api.common.functions.{FlatMapFunction, Partitioner}
 import org.apache.flink.api.common.state.{ValueState, ValueStateDescriptor}
-import org.apache.flink.api.java.io.TextInputFormat
 import org.apache.flink.api.scala.createTypeInformation
 import org.apache.flink.streaming.api.TimeCharacteristic
-import org.apache.flink.streaming.api.functions.{AssignerWithPeriodicWatermarks, ProcessFunction}
-import org.apache.flink.streaming.api.functions.source.SourceFunction
-import org.apache.flink.streaming.api.scala.{DataStream, StreamExecutionEnvironment}
-import org.apache.flink.streaming.api.scala.function.{AllWindowFunction, ProcessAllWindowFunction, ProcessWindowFunction, WindowFunction}
+import org.apache.flink.streaming.api.functions.AssignerWithPeriodicWatermarks
+import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
+import org.apache.flink.streaming.api.scala.function.ProcessWindowFunction
 import org.apache.flink.streaming.api.watermark.Watermark
-import org.apache.flink.streaming.api.windowing.assigners.WindowAssigner
 import org.apache.flink.streaming.api.windowing.evictors.Evictor
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
@@ -23,16 +16,16 @@ import org.apache.flink.streaming.runtime.operators.windowing.TimestampedValue
 import org.apache.flink.util.Collector
 
 import scala.collection.mutable.ListBuffer
-import scala.util.Random
-import scala.util.control.Breaks._
 
 object outlierDetect {
 
+  //data input
+  var data_input = "DummyData/stock/stock_id_20k.txt"
   //partitioning
-  val parallelism: Int = 8
+  var parallelism: Int = 8
   //count window variables (total / partitions)
-  val count_window: Int = 10000
-  val count_slide: Int = 500
+  var count_window: Int = 10000
+  var count_slide: Int = 500
   val count_slide_percent: Double = 100 * (count_slide.toDouble / count_window)
   //time window variables
   val time_window: Int = count_window / 10
@@ -50,11 +43,23 @@ object outlierDetect {
 
   def main(args: Array[String]) {
 
-    val env = StreamExecutionEnvironment.createLocalEnvironment(parallelism)
+    if(args.length != 4){
+      println("Wrong arguments!")
+      System.exit(1)
+    }
+
+    parallelism = args(0).toInt
+    count_window = args(1).toInt
+    count_slide = args(2).toInt
+    data_input = args(3)
+
+    val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
+    env.setParallelism(parallelism)
+
+    //val env = StreamExecutionEnvironment.createLocalEnvironment(parallelism)
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-
-    val data = env.readTextFile("DummyData/stock/stock_id_20k.txt")
+    val data = env.readTextFile(data_input)
     val mappedData = data
       .flatMap(line => {
         val splitLine = line.split("&")
@@ -102,10 +107,10 @@ object outlierDetect {
     val time = (timeEnd - timeStart) / 1000
 
     println("Finished outlier test")
-    println("Total run time: " + time + " sec")
-    val total_slides = times_per_slide.size
-    println(s"Total Slides: $total_slides")
-    println(s"Average time per slide: ${times_per_slide.values.sum.toDouble / total_slides / 1000}")
+//    println("Total run time: " + time + " sec")
+//    val total_slides = times_per_slide.size
+//    println(s"Total Slides: $total_slides")
+//    println(s"Average time per slide: ${times_per_slide.values.sum.toDouble / total_slides / 1000}")
   }
 
   class StormTimestamp extends AssignerWithPeriodicWatermarks[(Int, StormData)] with Serializable {
@@ -149,17 +154,17 @@ object outlierDetect {
         inputList.foreach(p => out.collect(p))
 
         //update stats
-        val time2 = System.currentTimeMillis()
-        val tmpkey = window.getEnd.toString
-        val tmpvalue = time2 - time1
-        val oldValue = times_per_slide.getOrElse(tmpkey, null)
-        if (oldValue == null) {
-          times_per_slide += ((tmpkey, tmpvalue))
-        } else {
-          val tmpValue = oldValue.toString.toLong
-          val newValue = tmpValue + tmpvalue
-          times_per_slide += ((tmpkey, newValue))
-        }
+//        val time2 = System.currentTimeMillis()
+//        val tmpkey = window.getEnd.toString
+//        val tmpvalue = time2 - time1
+//        val oldValue = times_per_slide.getOrElse(tmpkey, null)
+//        if (oldValue == null) {
+//          times_per_slide += ((tmpkey, tmpvalue))
+//        } else {
+//          val tmpValue = oldValue.toString.toLong
+//          val newValue = tmpValue + tmpvalue
+//          times_per_slide += ((tmpkey, newValue))
+//        }
       }
     }
 
@@ -256,17 +261,17 @@ object outlierDetect {
         out.collect((window.getEnd, outliers.size))
       }
       //update stats
-      val time2 = System.currentTimeMillis()
-      val tmpkey = window.getEnd.toString
-      val tmpvalue = time2 - time1
-      val oldValue = times_per_slide.getOrElse(tmpkey, null)
-      if (oldValue == null) {
-        times_per_slide += ((tmpkey, tmpvalue))
-      } else {
-        val tmpValue = oldValue.toString.toLong
-        val newValue = tmpValue + tmpvalue
-        times_per_slide += ((tmpkey, newValue))
-      }
+//      val time2 = System.currentTimeMillis()
+//      val tmpkey = window.getEnd.toString
+//      val tmpvalue = time2 - time1
+//      val oldValue = times_per_slide.getOrElse(tmpkey, null)
+//      if (oldValue == null) {
+//        times_per_slide += ((tmpkey, tmpvalue))
+//      } else {
+//        val tmpValue = oldValue.toString.toLong
+//        val newValue = tmpValue + tmpvalue
+//        times_per_slide += ((tmpkey, newValue))
+//      }
     }
 
     def combineElements(el1: StormData, el2: StormData): StormData = {
