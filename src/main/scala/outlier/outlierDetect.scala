@@ -152,8 +152,9 @@ object outlierDetect {
           refreshList(p, inputList, context.window)
         })
         inputList.foreach(p => {
-          if (!p.safe_inlier)
+          if (!p.safe_inlier) {
             out.collect(p)
+          }
         })
 
         //update stats
@@ -179,20 +180,23 @@ object outlierDetect {
 
         neighbors
           .foreach(x => {
-            if (x.arrival < window.getEnd - time_slide)
+            if (x.arrival < window.getEnd - time_slide) {
               node.insert_nn_before(x.arrival, k)
-            else
+            } else {
               node.count_after += 1
-              if (node.count_after >= k)
+              if (node.count_after >= k) {
                 node.safe_inlier = true
+              }
+            }
           })
 
         nodes
           .filter(x => x.arrival < window.getEnd - time_slide && neighbors.contains(x))
           .foreach(n => {
             n.count_after += 1
-            if (n.count_after >= k)
+            if (n.count_after >= k) {
               n.safe_inlier = true
+            }
           }) //add new neighbor to previous nodes
       }
     }
@@ -202,7 +206,6 @@ object outlierDetect {
       val res = scala.math.sqrt(value)
       res
     }
-
 
   }
 
@@ -237,13 +240,14 @@ object outlierDetect {
         //first remove old elements and elements that are safe inliers
         var forRemoval = ListBuffer[Int]()
         for (el <- current.outliers.values) {
-          if (el.arrival < window.getEnd - time_window) {
-            forRemoval = forRemoval.+=(el.id)
-          }else if(elements.count(_.id == el.id) == 0){
+          //if (el.arrival < window.getEnd - time_window) {
+          //forRemoval = forRemoval.+=(el.id)
+          //}else
+          if (elements.count(_.id == el.id) == 0) {
             forRemoval = forRemoval.+=(el.id)
           }
         }
-        forRemoval.foreach(el => current.outliers -= el)
+        forRemoval.foreach(el => current.outliers -= (el))
         //then insert or combine elements
         for (el <- elements) {
           val oldEl = current.outliers.getOrElse(el.id, null)
@@ -261,7 +265,7 @@ object outlierDetect {
         }
       }
       state.update(current)
-
+println(elements.size)
       if (current.outliers.size > k) {
 
         var outliers = ListBuffer[Int]()
@@ -299,7 +303,7 @@ object outlierDetect {
 
     override def process(key: Long, context: Context, elements: scala.Iterable[(Long, Int)], out: Collector[String]): Unit = {
       val outliers = elements.toList.map(_._2).sum
-      out.collect(s"window: $key outliers: $outliers")
+      out.collect(s"$key;$outliers")
     }
   }
 
