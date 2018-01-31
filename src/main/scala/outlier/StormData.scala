@@ -29,5 +29,5 @@ class StormData(data1d: Data1d) extends Data1d(data1d.value, data1d.arrival, dat
     case _ => false
   }
 
-  override def toString = s"StormData($id, $count_after, ${nn_before.size})"
+  override def toString = s"StormData($id, $count_after, ${nn_before.size}, $safe_inlier)"
 }
