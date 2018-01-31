@@ -144,32 +144,30 @@ object outlierDetect {
 
     override def process(key: Int, context: Context, elements: scala.Iterable[(Int, StormData)], out: Collector[StormData]): Unit = {
       val time1 = System.currentTimeMillis()
-      if (elements.size > k) {
-        val window = context.window
-        val inputList = elements.map(_._2).toList
+      val window = context.window
+      val inputList = elements.map(_._2).toList
 
-        inputList.filter(_.arrival >= window.getEnd - time_slide).foreach(p => {
-          refreshList(p, inputList, context.window)
-        })
-        inputList.foreach(p => {
-          if (!p.safe_inlier) {
-            out.collect(p)
-          }
-        })
+      inputList.filter(_.arrival >= window.getEnd - time_slide).foreach(p => {
+        refreshList(p, inputList, context.window)
+      })
+      inputList.foreach(p => {
+        if (!p.safe_inlier) {
+          out.collect(p)
+        }
+      })
 
-        //update stats
-        //        val time2 = System.currentTimeMillis()
-        //        val tmpkey = window.getEnd.toString
-        //        val tmpvalue = time2 - time1
-        //        val oldValue = times_per_slide.getOrElse(tmpkey, null)
-        //        if (oldValue == null) {
-        //          times_per_slide += ((tmpkey, tmpvalue))
-        //        } else {
-        //          val tmpValue = oldValue.toString.toLong
-        //          val newValue = tmpValue + tmpvalue
-        //          times_per_slide += ((tmpkey, newValue))
-        //        }
-      }
+      //update stats
+      //        val time2 = System.currentTimeMillis()
+      //        val tmpkey = window.getEnd.toString
+      //        val tmpvalue = time2 - time1
+      //        val oldValue = times_per_slide.getOrElse(tmpkey, null)
+      //        if (oldValue == null) {
+      //          times_per_slide += ((tmpkey, tmpvalue))
+      //        } else {
+      //          val tmpValue = oldValue.toString.toLong
+      //          val newValue = tmpValue + tmpvalue
+      //          times_per_slide += ((tmpkey, newValue))
+      //        }
     }
 
     def refreshList(node: StormData, nodes: List[StormData], window: TimeWindow): Unit = {
@@ -265,15 +263,13 @@ object outlierDetect {
       }
       state.update(current)
 
-      if (current.outliers.size > k) {
-
-        var outliers = ListBuffer[Int]()
-        for (el <- current.outliers.values) {
-          val nnBefore = el.nn_before.count(_ > window.getEnd - time_window)
-          if (nnBefore + el.count_after < k) outliers.+=(el.id)
-        }
-        out.collect((window.getEnd, outliers.size))
+      var outliers = ListBuffer[Int]()
+      for (el <- current.outliers.values) {
+        val nnBefore = el.nn_before.count(_ > window.getEnd - time_window)
+        if (nnBefore + el.count_after < k) outliers.+=(el.id)
       }
+      out.collect((window.getEnd, outliers.size))
+
       //update stats
       //      val time2 = System.currentTimeMillis()
       //      val tmpkey = window.getEnd.toString
