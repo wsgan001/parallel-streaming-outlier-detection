@@ -151,9 +151,6 @@ object outlierDetect {
         inputList.filter(_.arrival >= window.getEnd - time_slide).foreach(p => {
           refreshList(p, inputList, context.window)
         })
-      if(inputList.count(_.id == 250) == 1){
-        println(inputList.filter(_.id == 250))
-      }
         inputList.foreach(p => {
           if (!p.safe_inlier) {
             out.collect(p)
@@ -235,7 +232,6 @@ object outlierDetect {
             val newValue = combineElements(oldEl, el)
             newMap += ((el.id, newValue))
           }
-
         }
         current = Metadata(newMap)
       } else { //update list
@@ -269,23 +265,12 @@ object outlierDetect {
       }
       state.update(current)
 
-
-      if(elements.count(_.id == 500) >= 1){
-        println(elements.filter(_.id == 500))
-      }
-      if(current.outliers.values.count(_.id == 500) >= 1){
-        println(current.outliers.values.filter(_.id == 500))
-      }
-
       if (current.outliers.size > k) {
 
         var outliers = ListBuffer[Int]()
         for (el <- current.outliers.values) {
           val nnBefore = el.nn_before.count(_ > window.getEnd - time_window)
           if (nnBefore + el.count_after < k) outliers.+=(el.id)
-        }
-        if(outliers.count(_ == 500) >= 1){
-          println(outliers.filter(_ == 500))
         }
         out.collect((window.getEnd, outliers.size))
       }
