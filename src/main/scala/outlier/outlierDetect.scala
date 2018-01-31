@@ -173,6 +173,7 @@ object outlierDetect {
     def refreshList(node: StormData, nodes: List[StormData], window: TimeWindow): Unit = {
       if (nodes.nonEmpty) {
         val neighbors = nodes
+          .filter(_.id != node.id)
           .map(x => (x, distance(x, node)))
           .filter(_._2 <= range).map(_._1)
 
