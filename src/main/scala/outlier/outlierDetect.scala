@@ -38,7 +38,7 @@ object outlierDetect {
 
   def main(args: Array[String]) {
 
-    if(args.length != 4){
+    if (args.length != 4) {
       println("Wrong arguments!")
       System.exit(1)
     }
@@ -91,10 +91,10 @@ object outlierDetect {
     val time = (timeEnd - timeStart) / 1000
 
     println("Finished outlier test")
-//    println("Total run time: " + time + " sec")
-//    val total_slides = times_per_slide.size
-//    println(s"Total Slides: $total_slides")
-//    println(s"Average time per slide: ${times_per_slide.values.sum.toDouble / total_slides / 1000}")
+    //    println("Total run time: " + time + " sec")
+    //    val total_slides = times_per_slide.size
+    //    println(s"Total Slides: $total_slides")
+    //    println(s"Average time per slide: ${times_per_slide.values.sum.toDouble / total_slides / 1000}")
   }
 
   class StormTimestamp extends AssignerWithPeriodicWatermarks[(Int, StormData)] with Serializable {
@@ -113,28 +113,26 @@ object outlierDetect {
 
   class StormBasic extends AllWindowFunction[(Int, StormData), String, TimeWindow] {
     override def apply(window: TimeWindow, input: scala.Iterable[(Int, StormData)], out: Collector[String]): Unit = {
-//      val time1 = System.currentTimeMillis()
+      //      val time1 = System.currentTimeMillis()
       val inputList = input.map(line => line._2).toList
-      if (inputList.size >= k) {
-        inputList.filter(_.arrival >= window.getEnd - time_slide).foreach(p => {
-          refreshList(p, inputList, window)
+      inputList.filter(_.arrival >= window.getEnd - time_slide).foreach(p => {
+        refreshList(p, inputList, window)
+      })
+      val outliers = inputList
+        .filter(n => {
+          val value1 = n.count_after
+          val value2 = n.nn_before.count(p => p >= window.getStart)
+          value1 + value2 < k
         })
-        val outliers = inputList
-          .filter(n => {
-            val value1 = n.count_after
-            val value2 = n.nn_before.count(p => p >= window.getStart)
-            value1 + value2 < k
-          })
-        out.collect(s"window: $window outliers: ${outliers.size}")
-      }
-//      val time2 = System.currentTimeMillis()
-//      times_per_slide += ((window.getEnd.toString, time2 - time1))
+      out.collect(s"window: $window outliers: ${outliers.size}")
+      //      val time2 = System.currentTimeMillis()
+      //      times_per_slide += ((window.getEnd.toString, time2 - time1))
     }
 
     def refreshList(node: StormData, nodes: List[StormData], window: TimeWindow): Unit = {
       if (nodes.nonEmpty) {
         val neighbors = nodes
-          .map(x => (x, distance(x,node)))
+          .map(x => (x, distance(x, node)))
           .filter(_._2 <= range).map(_._1)
 
         neighbors
