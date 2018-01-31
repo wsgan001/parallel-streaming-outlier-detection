@@ -43,7 +43,7 @@ object outlierDetect {
 
   def main(args: Array[String]) {
 
-    if(args.length != 4){
+    if (args.length != 4) {
       println("Wrong arguments!")
       System.exit(1)
     }
@@ -84,7 +84,7 @@ object outlierDetect {
     val keyedData = timestampData
       .keyBy(_._1)
       .timeWindow(Time.milliseconds(time_window), Time.milliseconds(time_slide))
-      .allowedLateness(Time.milliseconds(5000))
+      .allowedLateness(Time.milliseconds(1000))
       .evictor(new StormEvictor)
       .process(new ExactStorm)
 
@@ -107,15 +107,15 @@ object outlierDetect {
     val time = (timeEnd - timeStart) / 1000
 
     println("Finished outlier test")
-//    println("Total run time: " + time + " sec")
-//    val total_slides = times_per_slide.size
-//    println(s"Total Slides: $total_slides")
-//    println(s"Average time per slide: ${times_per_slide.values.sum.toDouble / total_slides / 1000}")
+    //    println("Total run time: " + time + " sec")
+    //    val total_slides = times_per_slide.size
+    //    println(s"Total Slides: $total_slides")
+    //    println(s"Average time per slide: ${times_per_slide.values.sum.toDouble / total_slides / 1000}")
   }
 
   class StormTimestamp extends AssignerWithPeriodicWatermarks[(Int, StormData)] with Serializable {
 
-    val maxOutOfOrderness = 5000L // 5 seconds
+    val maxOutOfOrderness = 1000L // 1 seconds
 
     override def extractTimestamp(e: (Int, StormData), prevElementTimestamp: Long) = {
       val timestamp = e._2.arrival
@@ -151,20 +151,23 @@ object outlierDetect {
         inputList.filter(_.arrival >= window.getEnd - time_slide).foreach(p => {
           refreshList(p, inputList, context.window)
         })
-        inputList.foreach(p => out.collect(p))
+        inputList.foreach(p => {
+          if (!p.safe_inlier)
+            out.collect(p)
+        })
 
         //update stats
-//        val time2 = System.currentTimeMillis()
-//        val tmpkey = window.getEnd.toString
-//        val tmpvalue = time2 - time1
-//        val oldValue = times_per_slide.getOrElse(tmpkey, null)
-//        if (oldValue == null) {
-//          times_per_slide += ((tmpkey, tmpvalue))
-//        } else {
-//          val tmpValue = oldValue.toString.toLong
-//          val newValue = tmpValue + tmpvalue
-//          times_per_slide += ((tmpkey, newValue))
-//        }
+        //        val time2 = System.currentTimeMillis()
+        //        val tmpkey = window.getEnd.toString
+        //        val tmpvalue = time2 - time1
+        //        val oldValue = times_per_slide.getOrElse(tmpkey, null)
+        //        if (oldValue == null) {
+        //          times_per_slide += ((tmpkey, tmpvalue))
+        //        } else {
+        //          val tmpValue = oldValue.toString.toLong
+        //          val newValue = tmpValue + tmpvalue
+        //          times_per_slide += ((tmpkey, newValue))
+        //        }
       }
     }
 
@@ -180,11 +183,17 @@ object outlierDetect {
               node.insert_nn_before(x.arrival, k)
             else
               node.count_after += 1
+              if (node.count_after >= k)
+                node.safe_inlier = true
           })
 
         nodes
           .filter(x => x.arrival < window.getEnd - time_slide && neighbors.contains(x))
-          .foreach(n => n.count_after += 1) //add new neighbor to previous nodes
+          .foreach(n => {
+            n.count_after += 1
+            if (n.count_after >= k)
+              n.safe_inlier = true
+          }) //add new neighbor to previous nodes
       }
     }
 
@@ -220,18 +229,21 @@ object outlierDetect {
             val newValue = combineElements(oldEl, el)
             newMap += ((el.id, newValue))
           }
+
         }
         current = Metadata(newMap)
       } else { //update list
 
-        //first remove old elements
+        //first remove old elements and elements that are safe inliers
         var forRemoval = ListBuffer[Int]()
         for (el <- current.outliers.values) {
           if (el.arrival < window.getEnd - time_window) {
             forRemoval = forRemoval.+=(el.id)
+          }else if(elements.count(_.id == el.id) == 0){
+            forRemoval = forRemoval.+=(el.id)
           }
         }
-        forRemoval.foreach(el => current.outliers -= (el))
+        forRemoval.foreach(el => current.outliers -= el)
         //then insert or combine elements
         for (el <- elements) {
           val oldEl = current.outliers.getOrElse(el.id, null)
@@ -261,17 +273,17 @@ object outlierDetect {
         out.collect((window.getEnd, outliers.size))
       }
       //update stats
-//      val time2 = System.currentTimeMillis()
-//      val tmpkey = window.getEnd.toString
-//      val tmpvalue = time2 - time1
-//      val oldValue = times_per_slide.getOrElse(tmpkey, null)
-//      if (oldValue == null) {
-//        times_per_slide += ((tmpkey, tmpvalue))
-//      } else {
-//        val tmpValue = oldValue.toString.toLong
-//        val newValue = tmpValue + tmpvalue
-//        times_per_slide += ((tmpkey, newValue))
-//      }
+      //      val time2 = System.currentTimeMillis()
+      //      val tmpkey = window.getEnd.toString
+      //      val tmpvalue = time2 - time1
+      //      val oldValue = times_per_slide.getOrElse(tmpkey, null)
+      //      if (oldValue == null) {
+      //        times_per_slide += ((tmpkey, tmpvalue))
+      //      } else {
+      //        val tmpValue = oldValue.toString.toLong
+      //        val newValue = tmpValue + tmpvalue
+      //        times_per_slide += ((tmpkey, newValue))
+      //      }
     }
 
     def combineElements(el1: StormData, el2: StormData): StormData = {
