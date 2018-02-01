@@ -10,8 +10,10 @@ class StormData(data1d: Data1d) extends Data1d(data1d.value, data1d.arrival, dat
   def insert_nn_before(el: Long, k: Int): Unit ={
     if(nn_before.size == k){
       val tmp = nn_before.min
-      nn_before.-=(tmp)
-      nn_before.+=(el)
+      if (el > tmp) {
+        nn_before.-=(tmp)
+        nn_before.+=(el)
+      }
     }else{
       nn_before.+=(el)
     }
