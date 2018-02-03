@@ -51,9 +51,7 @@ object outlierDetect {
     val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
     env.setParallelism(parallelism)
 
-    //val env = StreamExecutionEnvironment.createLocalEnvironment(parallelism)
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
-
 
     val data = env.readTextFile(data_input)
     val mappedData = data
