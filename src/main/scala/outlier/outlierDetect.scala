@@ -245,7 +245,7 @@ object outlierDetect {
               }
             }
           }
-          val nnBefore = tmpData.nn_before.count(_ > window.getEnd - time_window)
+          val nnBefore = tmpData.nn_before.count(_ >= window.getEnd - time_window)
           if (nnBefore + tmpData.count_after < k) outliers += 1
         })
       out.collect((window.getEnd, outliers))
