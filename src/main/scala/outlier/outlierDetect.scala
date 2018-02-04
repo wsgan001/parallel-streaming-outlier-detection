@@ -266,7 +266,7 @@ object outlierDetect {
 
       var outliers = ListBuffer[Int]()
       for (el <- current.outliers.values) {
-        val nnBefore = el.nn_before.count(_ > window.getEnd - time_window)
+        val nnBefore = el.nn_before.count(_ >= window.getEnd - time_window)
         if (nnBefore + el.count_after < k) outliers.+=(el.id)
       }
       out.collect((window.getEnd, outliers.size))
