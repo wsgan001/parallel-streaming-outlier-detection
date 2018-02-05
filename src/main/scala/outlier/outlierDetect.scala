@@ -51,7 +51,9 @@ object outlierDetect {
   //helper to slow down stream
   val cur_time = System.currentTimeMillis() + 1000000L //some delay for the correct timestamp
   //hardcoded spatial partitioning
-  val spatial = Map[Int, String](8 -> "94.222!97.633!99.25!100.37!102.13!104.25!106.65",
+  val spatial = Map[Int, String](4 -> "97.633!100.37!104.25",
+    8 -> "94.222!97.633!99.25!100.37!102.13!104.25!106.65",
+    12->"90.7!95.965!97.633!98.75!99.7!100.37!101.49!102.84!104.25!105.59!108.36",
     32 -> "77.457!87.231!91.88!94.222!95.59!96.5!97.125!97.633!98.074!98.5!98.888!99.25!99.588!99.897!100.07!100.37!100.72!101.16!101.65!102.13!102.65!103.18!103.72!104.25!104.78!105.25!105.79!106.65!107.84!109.75!112.14",
     16 -> "87.231!94.222!96.5!97.633!98.5!99.25!99.897!100.37!101.16!102.13!103.18!104.25!105.25!106.65!109.75")
 
@@ -62,8 +64,8 @@ object outlierDetect {
     if (args.length != 4) {
       println("Wrong arguments!")
       System.exit(1)
-    } else if (args(0).toInt != 8 && args(0).toInt != 32 && args(0).toInt != 16) {
-      println("Parallelism should be 8, 32 or 16!")
+    } else if (args(0).toInt != 8 && args(0).toInt != 4 && args(0).toInt != 12 && args(0).toInt != 32 && args(0).toInt != 16) {
+      println("Parallelism should be 4, 8, 12, 32 or 16!")
       System.exit(1)
     }
 
@@ -84,6 +86,10 @@ object outlierDetect {
       points_string = spatial(32).split("!").toList
     } else if (parallelism == 16) {
       points_string = spatial(16).split("!").toList
+    } else if (parallelism == 12) {
+    points_string = spatial(12).split("!").toList
+    } else if (parallelism == 4) {
+      points_string = spatial(4).split("!").toList
     }
     val points = points_string.map(_.toDouble)
 
