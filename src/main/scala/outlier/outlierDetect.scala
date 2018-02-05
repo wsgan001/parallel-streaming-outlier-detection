@@ -219,7 +219,7 @@ object outlierDetect {
           }
         }
         val mySplit = new ComposedSplitFunction[Data1d](nonRandomPromotion, new PartitionFunctions.BalancedPartition[Data1d])
-        val myTree = new MTree[Data1d](k, count_window + count_slide, DistanceFunctions.EUCLIDEAN, mySplit)
+        val myTree = new MTree[Data1d](k, 2* count_window, DistanceFunctions.EUCLIDEAN, mySplit)
         for (el <- elements) {
           myTree.add(el._2)
         }
