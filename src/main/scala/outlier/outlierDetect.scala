@@ -136,7 +136,8 @@ object outlierDetect {
       .keyBy(_._1)
       .timeWindow(Time.milliseconds(time_window), Time.milliseconds(time_slide))
       .allowedLateness(Time.milliseconds(1000))
-      .evictor(new StormEvictor)
+      //With the evictor the results are the same but the Mtree keeps growing
+      //.evictor(new StormEvictor)
       .process(new ExactStorm)
 
     val groupedOutliers = keyedData
