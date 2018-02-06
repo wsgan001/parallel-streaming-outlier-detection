@@ -20,12 +20,10 @@ import scala.collection.mutable.ListBuffer
 object outlierDetect {
 
   //data input
-  var data_input = "DummyData/stock/stock_id_20k.txt"
-  //partitioning
-  var parallelism: Int = 8
+  var data_input = "data/stock_100_50.txt"
   //count window variables (total / partitions)
-  var count_window: Int = 10000
-  var count_slide: Int = 500
+  var count_window: Int = 100000
+  var count_slide: Int = 50000
   var count_slide_percent: Double = 100 * (count_slide.toDouble / count_window)
   //time window variables
   var time_window: Int = count_window / 10
@@ -43,24 +41,9 @@ object outlierDetect {
 
   def main(args: Array[String]) {
 
-    if (args.length != 4) {
-      println("Wrong arguments!")
-      System.exit(1)
-    }
-
-    parallelism = args(0).toInt
-    count_window = args(1).toInt
-    count_slide = args(2).toInt
-    data_input = args(3)
-    count_slide_percent = 100 * (count_slide.toDouble / count_window)
-    //time window variables
-    time_window = count_window / 10
-    time_slide = (time_window * (count_slide_percent / 100)).toInt
-
     val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
-    env.setParallelism(parallelism)
+    val parallelism = env.getParallelism
 
-    //val env = StreamExecutionEnvironment.createLocalEnvironment(parallelism)
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
     val data = env.readTextFile(data_input)
@@ -111,10 +94,6 @@ object outlierDetect {
     val time = (timeEnd - timeStart) / 1000
 
     println("Finished outlier test")
-    //    println("Total run time: " + time + " sec")
-    //    val total_slides = times_per_slide.size
-    //    println(s"Total Slides: $total_slides")
-    //    println(s"Average time per slide: ${times_per_slide.values.sum.toDouble / total_slides / 1000}")
   }
 
   class StormTimestamp extends AssignerWithPeriodicWatermarks[(Int, StormData)] with Serializable {
@@ -159,19 +138,6 @@ object outlierDetect {
           out.collect(p)
         }
       })
-
-      //update stats
-      //        val time2 = System.currentTimeMillis()
-      //        val tmpkey = window.getEnd.toString
-      //        val tmpvalue = time2 - time1
-      //        val oldValue = times_per_slide.getOrElse(tmpkey, null)
-      //        if (oldValue == null) {
-      //          times_per_slide += ((tmpkey, tmpvalue))
-      //        } else {
-      //          val tmpValue = oldValue.toString.toLong
-      //          val newValue = tmpValue + tmpvalue
-      //          times_per_slide += ((tmpkey, newValue))
-      //        }
     }
 
     def refreshList(node: StormData, nodes: List[StormData], window: TimeWindow): Unit = {
@@ -242,9 +208,6 @@ object outlierDetect {
         //first remove old elements and elements that are safe inliers
         var forRemoval = ListBuffer[Int]()
         for (el <- current.outliers.values) {
-          //if (el.arrival < window.getEnd - time_window) {
-          //forRemoval = forRemoval.+=(el.id)
-          //}else
           if (elements.count(_.id == el.id) == 0) {
             forRemoval = forRemoval.+=(el.id)
           }
@@ -274,19 +237,6 @@ object outlierDetect {
         if (nnBefore + el.count_after < k) outliers.+=(el.id)
       }
       out.collect((window.getEnd, outliers.size))
-
-      //update stats
-      //      val time2 = System.currentTimeMillis()
-      //      val tmpkey = window.getEnd.toString
-      //      val tmpvalue = time2 - time1
-      //      val oldValue = times_per_slide.getOrElse(tmpkey, null)
-      //      if (oldValue == null) {
-      //        times_per_slide += ((tmpkey, tmpvalue))
-      //      } else {
-      //        val tmpValue = oldValue.toString.toLong
-      //        val newValue = tmpValue + tmpvalue
-      //        times_per_slide += ((tmpkey, newValue))
-      //      }
     }
 
     def combineElements(el1: StormData, el2: StormData): StormData = {
