@@ -30,16 +30,14 @@ import scala.util.control.Breaks._
 object outlierDetect {
 
   //data input
-  var data_input: String = "DummyData/stock/stock_id_20k.txt"
-  //partitioning
-  var parallelism: Int = 2
+  val data_input: String = "data/stock_10_10.txt"
   //count window variables (total / partitions)
-  var count_window: Int = 10000
-  var count_slide: Int = 500
-  var count_slide_percent: Double = 100 * (count_slide.toDouble / count_window)
+  val count_window: Int = 10000
+  val count_slide: Int = 100
+  val count_slide_percent: Double = 100 * (count_slide.toDouble / count_window)
   //time window variables
-  var time_window: Int = count_window / 10
-  var time_slide: Int = (time_window * (count_slide_percent / 100)).toInt
+  val time_window: Int = count_window / 10
+  val time_slide: Int = (time_window * (count_slide_percent / 100)).toInt
   //distance outlier variables
   val k: Int = 50
   val range: Double = 0.45
@@ -62,22 +60,10 @@ object outlierDetect {
 
   def main(args: Array[String]) {
 
-    if (args.length != 4) {
-      println("Wrong arguments!")
-      System.exit(1)
-    } else if (args(0).toInt != 2 && args(0).toInt != 8 && args(0).toInt != 4 && args(0).toInt != 12 && args(0).toInt != 32 && args(0).toInt != 16) {
-      println("Parallelism should be 2, 4, 8, 12, 32 or 16!")
-      System.exit(1)
-    }
+    val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
+    val parallelism = env.getParallelism
 
-    parallelism = args(0).toInt
-    count_window = args(1).toInt
-    count_slide = args(2).toInt
-    data_input = args(3)
-    count_slide_percent = 100 * (count_slide.toDouble / count_window)
-    //time window variables
-    time_window = count_window / 10
-    time_slide = (time_window * (count_slide_percent / 100)).toInt
+    env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
     var points_string = List[String]()
     if (parallelism == 8) {
@@ -95,10 +81,6 @@ object outlierDetect {
     }
     val points = points_string.map(_.toDouble)
 
-    val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
-    env.setParallelism(parallelism)
-
-    env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
     val data = env.readTextFile(data_input)
     val mappedData = data
