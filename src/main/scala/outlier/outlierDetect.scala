@@ -15,16 +15,14 @@ import scala.collection.mutable.ListBuffer
 object outlierDetect {
 
   //data input
-  var data_input = "DummyData/stock/stock_id_20k.txt"
-  //partitioning
-  var parallelism: Int = 1
+  val data_input = "data/stock_100_50.txt"
   //count window variables (total / partitions)
-  var count_window: Int = 10000
-  var count_slide: Int = 500
-  var count_slide_percent: Double = 100 * (count_slide.toDouble / count_window)
+  val count_window: Int = 100000
+  val count_slide: Int = 50000
+  val count_slide_percent: Double = 100 * (count_slide.toDouble / count_window)
   //time window variables
-  var time_window: Int = count_window / 10
-  var time_slide: Int = (time_window * (count_slide_percent / 100)).toInt
+  val time_window: Int = count_window / 10
+  val time_slide: Int = (time_window * (count_slide_percent / 100)).toInt
   //distance outlier variables
   val k: Int = 50
   val range: Double = 0.45
@@ -38,22 +36,9 @@ object outlierDetect {
 
   def main(args: Array[String]) {
 
-    if (args.length != 4) {
-      println("Wrong arguments!")
-      System.exit(1)
-    }
-
-    //parallelism = args(0).toInt
-    count_window = args(1).toInt
-    count_slide = args(2).toInt
-    data_input = args(3)
-    count_slide_percent = 100 * (count_slide.toDouble / count_window)
-    //time window variables
-    time_window = count_window / 10
-    time_slide = (time_window * (count_slide_percent / 100)).toInt
 
     val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
-    env.setParallelism(parallelism)
+    val parallelism = env.getParallelism
 
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
