@@ -30,16 +30,14 @@ import scala.util.control.Breaks._
 object outlierDetect {
 
   //data input
-  var data_input: String = "DummyData/stock/stock_id_20k.txt"
-  //partitioning
-  var parallelism: Int = 8
+  val data_input: String = "data/stock_100_50.txt"
   //count window variables (total / partitions)
-  var count_window: Int = 10000
-  var count_slide: Int = 500
-  var count_slide_percent: Double = 100 * (count_slide.toDouble / count_window)
+  val count_window: Int = 100000
+  val count_slide: Int = 50000
+  val count_slide_percent: Double = 100 * (count_slide.toDouble / count_window)
   //time window variables
-  var time_window: Int = count_window / 10
-  var time_slide: Int = (time_window * (count_slide_percent / 100)).toInt
+  val time_window: Int = count_window / 10
+  val time_slide: Int = (time_window * (count_slide_percent / 100)).toInt
   //distance outlier variables
   val k: Int = 50
   val range: Double = 0.45
@@ -51,28 +49,11 @@ object outlierDetect {
   //helper to slow down stream
   val cur_time = System.currentTimeMillis() + 1000000L //some delay for the correct timestamp
 
-  var id = 0
-
   def main(args: Array[String]) {
 
-    if (args.length != 4) {
-      println("Wrong arguments!")
-      System.exit(1)
-    }
-
-    parallelism = args(0).toInt
-    count_window = args(1).toInt
-    count_slide = args(2).toInt
-    data_input = args(3)
-    count_slide_percent = 100 * (count_slide.toDouble / count_window)
-    //time window variables
-    time_window = count_window / 10
-    time_slide = (time_window * (count_slide_percent / 100)).toInt
-
     val env: StreamExecutionEnvironment = StreamExecutionEnvironment.getExecutionEnvironment
-    env.setParallelism(parallelism)
+    val parallelism = env.getParallelism
 
-    //val env = StreamExecutionEnvironment.createLocalEnvironment(parallelism)
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
     val data = env.readTextFile(data_input)
@@ -100,7 +81,7 @@ object outlierDetect {
     val keyedData = timestampData
       .keyBy(_._1)
       .timeWindow(Time.milliseconds(time_window), Time.milliseconds(time_slide))
-      .allowedLateness(Time.milliseconds(5000))
+      .allowedLateness(Time.milliseconds(1000))
       .evictor(new StormEvictor)
       .process(new ExactStorm)
 
@@ -123,15 +104,11 @@ object outlierDetect {
     val time = (timeEnd - timeStart) / 1000
 
     println("Finished outlier test")
-    //    println("Total run time: " + time + " sec")
-    //    val total_slides = times_per_slide.size
-    //    println(s"Total Slides: $total_slides")
-    //    println(s"Average time per slide: ${times_per_slide.values.sum.toDouble / total_slides / 1000}")
-  }
+ }
 
   class StormTimestamp extends AssignerWithPeriodicWatermarks[(Int, Data1d)] with Serializable {
 
-    val maxOutOfOrderness = 5000L // 30 seconds
+    val maxOutOfOrderness = 1000L // 5 seconds
 
     override def extractTimestamp(e: (Int, Data1d), prevElementTimestamp: Long) = {
       val timestamp = e._2.arrival
@@ -227,19 +204,6 @@ object outlierDetect {
         .foreach(el => current.tree.remove(el._2))
       //update state
       state.update(current)
-
-      //update stats
-      //        val time2 = System.currentTimeMillis()
-      //        val tmpkey = window.getEnd.toString
-      //        val tmpvalue = time2 - time1
-      //        val oldValue = times_per_slide.getOrElse(tmpkey, null)
-      //        if (oldValue == null) {
-      //          times_per_slide += ((tmpkey, tmpvalue))
-      //        } else {
-      //          val tmpValue = oldValue.toString.toLong
-      //          val newValue = tmpValue + tmpvalue
-      //          times_per_slide += ((tmpkey, newValue))
-      //        }
     }
   }
 
@@ -310,18 +274,6 @@ object outlierDetect {
       }
 
       out.collect((window.getEnd, outliers.size))
-      //update stats
-      //      val time2 = System.currentTimeMillis()
-      //      val tmpkey = window.getEnd.toString
-      //      val tmpvalue = time2 - time1
-      //      val oldValue = times_per_slide.getOrElse(tmpkey, null)
-      //      if (oldValue == null) {
-      //        times_per_slide += ((tmpkey, tmpvalue))
-      //      } else {
-      //        val tmpValue = oldValue.toString.toLong
-      //        val newValue = tmpValue + tmpvalue
-      //        times_per_slide += ((tmpkey, newValue))
-      //      }
     }
 
     def combineElements(el1: StormData, el2: StormData): StormData = {
