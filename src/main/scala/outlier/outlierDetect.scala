@@ -30,10 +30,10 @@ import scala.util.control.Breaks._
 object outlierDetect {
 
   //data input
-  val data_input: String = "data/stock_10_10.txt"
+  val data_input: String = "data/stock_100_50.txt"
   //count window variables (total / partitions)
-  val count_window: Int = 10000
-  val count_slide: Int = 100
+  val count_window: Int = 100000
+  val count_slide: Int = 50000
   val count_slide_percent: Double = 100 * (count_slide.toDouble / count_window)
   //time window variables
   val time_window: Int = count_window / 10
@@ -55,8 +55,6 @@ object outlierDetect {
     12 -> "90.7!95.965!97.633!98.75!99.7!100.37!101.49!102.84!104.25!105.59!108.36",
     32 -> "77.457!87.231!91.88!94.222!95.59!96.5!97.125!97.633!98.074!98.5!98.888!99.25!99.588!99.897!100.07!100.37!100.72!101.16!101.65!102.13!102.65!103.18!103.72!104.25!104.78!105.25!105.79!106.65!107.84!109.75!112.14",
     16 -> "87.231!94.222!96.5!97.633!98.5!99.25!99.897!100.37!101.16!102.13!103.18!104.25!105.25!106.65!109.75")
-
-  var id = 0
 
   def main(args: Array[String]) {
 
