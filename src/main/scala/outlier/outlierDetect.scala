@@ -32,7 +32,7 @@ object outlierDetect {
   //data input
   var data_input: String = "DummyData/stock/stock_id_20k.txt"
   //partitioning
-  var parallelism: Int = 8
+  var parallelism: Int = 2
   //count window variables (total / partitions)
   var count_window: Int = 10000
   var count_slide: Int = 500
